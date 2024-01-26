@@ -1,0 +1,5 @@
+/models/
+/log/
+/wandb/
+__pycache__
+*.pyc
