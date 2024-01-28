@@ -174,7 +174,7 @@ class BertCNN2HEAD_UIT(Module):
 # @title Finetune Model
 
 class Linear2HEAD(Module):
-    def __init__(self, embedding_dim, n_filters=64, filter_sizes= [1,2,3,5],  dropout=0.2,activation=None):
+    def __init__(self, embedding_dim, dropout=0.2,activation=None):
 
         super().__init__()
         self.ln1= nn.LayerNorm(embedding_dim)

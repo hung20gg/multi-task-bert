@@ -43,7 +43,7 @@ class Trainer:
 
     self.is_schedule = False
     self.model_prameters = list(self.bertcnn.parameters())
-    self.optimizer = AdamW(self.model_prameters, lr=1e-4, eps=5e-9)
+    self.optimizer = AdamW(self.model_prameters, lr=2e-5, eps=5e-9)
     self.criterion = nn.CrossEntropyLoss().to(self.device)
     self.smart_loss_fn = SMARTLoss(eval_fn = self.bertcnn, loss_fn = kl_loss, loss_last_fn = sym_kl_loss)
     self.weight = 0.02
@@ -76,11 +76,11 @@ class Trainer:
       loss1 = self.criterion(sent_predictions, b_sent) + self.weight * self.smart_loss_fn(b_input_ids, sent_predictions, b_input_mask,sent=True)
       loss2 = self.criterion(clas_predictions, b_clas) + self.weight * self.smart_loss_fn(b_input_ids, clas_predictions, b_input_mask,sent=False)
       # else:
-      #   loss1 = self.criterion(sent_predictions, b_sent)
-      #   loss2 = self.criterion(clas_predictions, b_clas)
+      # loss1 = self.criterion(sent_predictions, b_sent)
+      # loss2 = self.criterion(clas_predictions, b_clas)
         
  
-      t_loss = loss1*10/14 + loss2*4/14
+      t_loss = loss1*self.percentage + loss2*(1-self.percentage)
       
       
 
@@ -157,7 +157,8 @@ class Trainer:
     elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
     return elapsed_mins, elapsed_secs
 
-  def fit(self,schedule=True,epochs=20,optim=None,report = False,name="saved"):
+  def fit(self,schedule=True,epochs=20,optim=None,report = False,name="saved",percentage=0.7):
+    self.percentage = percentage
     temp = 30
     if self.extract:
       temp = 15
@@ -191,25 +192,25 @@ class Trainer:
 
       epoch_mins, epoch_secs = self.epoch_time(start_time, end_time)
       
-      with open(f"log\log-{self.name}{'-smart'if self.is_smart else ''}-{'boosting-' if self.extract else ''}v1.2.txt","a") as f:
+      with open(f"log\log-{self.name}{'-smart'if self.is_smart else ''}-{'boosting-' if self.extract else ''}{int(self.percentage*10)}_{10-int(self.percentage*10)}-v1.2.txt","a") as f:
         f.write(f'\nEpoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
 
         f.write(f'\n\tTrain Loss : {train_loss:.3f}  | Val. Loss  : {valid_loss:.3f}')
         f.write(f'\n\tTrn.acc se : {train_acc_sent*100:.2f}% | Trn.acc ca : {train_acc_clas*100:.2f}%')
         f.write(f'\n\tVal.acc se : {valid_accs[0]*100:.2f}% | Val.acc ca : {valid_accs[1]*100:.2f}%')
-        f.write(f'\n\tVal.F1m se : {valid_f1s[0]*100:.2f}  |  Val.F1m ca : {valid_f1s[1]*100:.2f}')
-        f.write(f'\n\tVal.F1w se : {valid_f1s[2]*100:.2f}  |  Val.F1w ca : {valid_f1s[3]*100:.2f}')
+        f.write(f'\n\tVal.F1m se : {valid_f1s[0]*100:.2f}  | Val.F1m ca : {valid_f1s[1]*100:.2f}')
+        f.write(f'\n\tVal.F1w se : {valid_f1s[2]*100:.2f}  | Val.F1w ca : {valid_f1s[3]*100:.2f}')
         
         print(f'Epoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
 
         print(f'\tTrain Loss : {train_loss:.3f}  | Val. Loss  : {valid_loss:.3f}')
         print(f'\tTrn.acc se : {train_acc_sent*100:.2f}% | Trn.acc ca : {train_acc_clas*100:.2f}%')
         print(f'\tVal.acc se : {valid_accs[0]*100:.2f}% | Val.acc ca : {valid_accs[1]*100:.2f}%')
-        print(f'\tVal.F1m se : {valid_f1s[0]*100:.2f}  |  Val.F1m ca : {valid_f1s[1]*100:.2f}')
-        print(f'\tVal.F1w se : {valid_f1s[2]*100:.2f}  |  Val.F1w ca : {valid_f1s[3]*100:.2f}')
+        print(f'\tVal.F1m se : {valid_f1s[0]*100:.2f}  | Val.F1m ca : {valid_f1s[1]*100:.2f}')
+        print(f'\tVal.F1w se : {valid_f1s[2]*100:.2f}  | Val.F1w ca : {valid_f1s[3]*100:.2f}')
 
-        if valid_accs[1]>=0.78 and valid_accs[0]>=0.84 and valid_f1s[0]>=0.84 and valid_f1s[1]>=0.7:
-            torch.save(self.bertcnn.state_dict(),f'models/{self.model_type}/Epoch-{epoch+1}-2-head-{self.model_type}-{"smart"if self.is_smart else ""}{"-boosting" if self.extract else ""}-7_3-pcg.pt')
+        if valid_accs[1]>=0.8 and valid_accs[0]>=0.843 and valid_f1s[0]>=0.85 and valid_f1s[1]>=0.72:
+            torch.save(self.bertcnn.state_dict(),f'models/{self.model_type}/Epoch-{epoch+1}-2-head-{self.model_type}-{"smart"if self.is_smart else ""}{"-boosting" if self.extract else ""}-{int(self.percentage*10)}_{10-int(self.percentage*10)}-pcg.pt')
             f.write(f'\nModel epoch {epoch+1} saved')
         f.write('\n=============Epoch Ended==============')
         print('\n=============Epoch Ended==============')
