@@ -31,21 +31,8 @@ class Linear3HEAD(Module):
 
         self.dropout_sent = nn.Dropout(dropout)
         self.dropout_clas = nn.Dropout(dropout)
-    def forward(self, encoded,encoded2=None):
-        if encoded2:
-          embedded = self.activation(self.fc_input(encoded)) # bs, 64, 768
-          embedded2 = self.activation(self.fc_input(encoded2))
-          # Warmup truoc khi chia head
-          embedded = self.ln1(embedded)
-          embedded2 = self.ln2(embedded)
-          
-          mlm = self.MLM(embedded2)
-          sent = self.out_sent(embedded)
-          clas = self.out_clas(embedded)
-
-          return sent, clas, mlm
-          
-
+    def forward(self, encoded,encoded2=None, mlm=False):
+        
         embedded = self.activation(self.fc_input(encoded)) # bs, 64, 768
 
         # Warmup truoc khi chia head
@@ -53,6 +40,10 @@ class Linear3HEAD(Module):
        
         sent = self.out_sent(embedded)
         clas = self.out_clas(embedded)
+        if mlm:
+          embedded2 = self.activation(self.fc_input2(encoded2))
+          mlm = self.MLM(embedded2)
+          return sent, clas, mlm
 
         return sent, clas
 
@@ -64,10 +55,10 @@ class BertLinear3HEAD(Module):
         self.BertModel.to(device)
         # self.phoBertModel.load_state_dict(torch.load(pretrained_path))
         self.linear = Linear3HEAD(768)
-    def forward(self,sentences,attention,sentences2=None,attention2=None):
+    def forward(self,sentences,attention,sentences2=None, mlm=False):
        embedded = self.BertModel(sentences,attention_mask=attention).last_hidden_state[:,0,:]
-       embedded2 = None
-       if sentences2:
-         embedded2 = self.BertModel(sentences2,attention_mask=attention2).last_hidden_state[:,0,:]
-       return self.linear(embedded,embedded2)
+       embedded2 = nn.Identity(768)
+       if mlm:
+         embedded2 = self.BertModel(sentences2,attention)[0]
+       return self.linear(embedded,embedded2, mlm=mlm)
        

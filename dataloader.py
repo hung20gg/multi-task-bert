@@ -60,8 +60,8 @@ class CreateDataset:
   def __len__ (self):
     plus1 = 0 if self.labels1.shape[0]%self.batch_size == 0 else 1
     return self.labels1.shape[0]//self.batch_size +plus1
-  
-  class CreateMLMDataset:
+
+class CreateMLMDataset:
     def __init__ (self,sentences,model_name,batch_size=32,max_length=128):
       self.tokenizer=AutoTokenizer.from_pretrained(model_name, use_fast=False)
       self.batch_size=batch_size
@@ -88,14 +88,14 @@ class CreateDataset:
           attention_masks.append(encoded_dict['attention_mask'])
           max_pos.append(torch.sum(encoded_dict['attention_mask']))
           
-      self.max_pos = torch.cat(max_pos,dim=0).type(torch.FloatTensor).to(DEVICE).reshape(-1,1)
+      # self.max_pos = torch.cat(max_pos,dim=0).type(torch.FloatTensor).to(DEVICE).reshape(-1,1)
       self.input_ids = torch.cat(input_ids,dim=0).to(DEVICE)
       self.attention_masks = torch.cat(attention_masks,dim=0).to(DEVICE)
     def todataloader(self):
       self.encoder_generator()
 
 
-      self.dataset = TensorDataset(self.input_ids, self.attention_masks ,self.max_pos)
+      self.dataset = TensorDataset(self.input_ids, self.attention_masks)
       # generator = torch.Generator(device=DEVICE)
       self.data_loader = DataLoader(self.dataset,
                                     # sampler=RandomSampler(self.dataset),
@@ -104,28 +104,68 @@ class CreateDataset:
                                   )
       return self.data_loader
   
-  class DataCollatorHandMade:
+class DataCollatorHandMade:
     
-    def __init__(self,model_name):
+    def __init__(self,model_name, mlm_prob = 0.3):
       self.tokenizer = AutoTokenizer.from_pretrained(model_name)
       self.mask_token_id = self.tokenizer.mask_token_id
+      self.mlm_prob = mlm_prob
   
-    def random_label(self,input_ids: torch.Tensor,attention_mask: torch.Tensor,max_pos: torch.Tensor):
-      mlm_input = input_ids.clone()
-      max_pos2  = max_pos.clone().cpu().numpy()
-      
-      mask_pos = np.random.randint(0,max_pos2)
-    
-      mask_pos = torch.Tensor(mask_pos).type(torch.IntTensor)
-      
-      mlm_input[torch.arange(input_ids.shape[0])[:,None],mask_pos] = self.mask_token_id
-      labels = copy.deepcopy(input_ids)
-      labels[mlm_input != self.mask_token_id]=-100
-      
-      return mlm_input, labels
-      
+    def random_label(self,input_ids: torch.Tensor,attention_mask: torch.Tensor):
+        mlm_inputs = []
+        labels =[]
+        total_mask = 0
+        
+        for input_id, att in zip(input_ids,attention_mask):
+          mlm_input = input_id.clone()
+          max_pos  = int(torch.sum(att))
+          
+          num_mask = int(max_pos * self.mlm_prob) 
+          total_mask += num_mask      
+          mask_pos = torch.randint(0, max_pos, size=(num_mask,), dtype=torch.int32)
+          
+          mask = torch.zeros(len(mlm_input))
+          mask[mask_pos] = 1
+          
+          mask = mask.type(torch.bool)
+          
+          mlm_input[mask] = self.mask_token_id
+          label = copy.deepcopy(input_id)
+          label[mlm_input != self.mask_token_id]=-100
 
+          
+          lucky_mask = torch.randint(1,11,size = (num_mask,), dtype=torch.int32)
+          for i,lucky in enumerate(lucky_mask):
+            if int(lucky)%8==0: # 10%
+              mlm_input[mask_pos[i]] = input_id[mask_pos[i]]
+            elif int(lucky)%7==0: # 10%
+              mlm_input[mask_pos[i]] = torch.randint(0,64000,size=(1,))[0]
+          
+          mlm_inputs.append(mlm_input.reshape(1,-1))
+          labels.append(label.reshape(1,-1))
+          
+        mlm_inputs = torch.cat(mlm_inputs, dim=0).to(DEVICE)
+        labels = torch.cat(labels, dim=0).to(DEVICE)
+        return mlm_inputs, labels, total_mask
       
+def label_for_mlm(result, mlm_labels):
+    y_pred=[]
+    labels=[]
+    for i in range(result.shape[0]):
+        tmp_res = torch.zeros(result.shape[1])
+        tmp_res[mlm_labels[i]!=-100] = 1
+        
+        for j in range(result.shape[1]):
+            if tmp_res[j]==1:
+                lb = mlm_labels[i,j]
+                pred = result[i][j]
+                y_pred.append(pred.reshape(1,-1))
+                labels.append(lb)
+
+    labels= torch.Tensor(labels).type(torch.LongTensor).to(DEVICE)
+    y_pred = torch.cat(y_pred,dim=0).to(DEVICE)  
+    
+    return y_pred, labels
       
       
         
