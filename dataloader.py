@@ -8,7 +8,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class CreateDataset:
-  def __init__ (self,sentences,labels1,labels2,model_name,batch_size=32,max_length=64):
+  def __init__ (self,sentences,labels1,labels2,model_name,batch_size=32,max_length=128):
     self.tokenizer=AutoTokenizer.from_pretrained(model_name, use_fast=False)
     self.batch_size=batch_size
     self.model_name=model_name
@@ -52,7 +52,7 @@ class CreateDataset:
     self.data_loader = DataLoader(self.dataset,
                                   # sampler=RandomSampler(self.dataset),
                                   batch_size=self.batch_size,
-                                  # shuffle=True
+                                  shuffle=True
                                   # generator = generator,
                                 )
     return self.data_loader
@@ -80,7 +80,7 @@ class CreateMLMDataset:
           encoded_dict = self.tokenizer.encode_plus(sent,
                                               add_special_tokens=True,
                                               max_length=self.max_length,
-                                              pad_to_max_length=True,
+                                              padding=True,
                                               truncation = True,
                                               return_attention_mask=True,
                                               return_tensors='pt')

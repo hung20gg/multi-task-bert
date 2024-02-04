@@ -7,7 +7,6 @@ from torch.optim import lr_scheduler,AdamW, Adam
 import numpy as np
 from tqdm import tqdm
 import time
-from pcg import PCGrad
 
 from sklearn.metrics import accuracy_score,f1_score
 
@@ -192,7 +191,7 @@ class Trainer:
 
       epoch_mins, epoch_secs = self.epoch_time(start_time, end_time)
       
-      with open(f"log\log-{self.name}{'-smart'if self.is_smart else ''}-{'boosting-' if self.extract else ''}{int(self.percentage*10)}_{10-int(self.percentage*10)}-v1.2.txt","a") as f:
+      with open(f"log\log-{self.name}{'-smart'if self.is_smart else ''}-{'boosting-' if self.extract else ''}{int(self.percentage*10)}_{10-int(self.percentage*10)}-redo.txt","a") as f:
         f.write(f'\nEpoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
 
         f.write(f'\n\tTrain Loss : {train_loss:.3f}  | Val. Loss  : {valid_loss:.3f}')
@@ -210,7 +209,7 @@ class Trainer:
         print(f'\tVal.F1w se : {valid_f1s[2]*100:.2f}  | Val.F1w ca : {valid_f1s[3]*100:.2f}')
 
         if valid_accs[1]>=0.8 and valid_accs[0]>=0.843 and valid_f1s[0]>=0.85 and valid_f1s[1]>=0.72:
-            torch.save(self.bertcnn.state_dict(),f'models/{self.model_type}/Epoch-{epoch+1}-2-head-{self.model_type}-{"smart"if self.is_smart else ""}{"-boosting" if self.extract else ""}-{int(self.percentage*10)}_{10-int(self.percentage*10)}-pcg.pt')
+            torch.save(self.bertcnn.state_dict(),f'models/{self.model_type}/Epoch-{epoch+1}-2-head-{self.model_type}-{"smart"if self.is_smart else ""}{"-boosting" if self.extract else ""}-{int(self.percentage*10)}_{10-int(self.percentage*10)}-redo.pt')
             f.write(f'\nModel epoch {epoch+1} saved')
         f.write('\n=============Epoch Ended==============')
         print('\n=============Epoch Ended==============')
