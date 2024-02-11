@@ -8,6 +8,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
+# This is the multi-task model without MLM head
+# We try to also CNN for this task, but it seem to have no different with the linear model
+
+# We use CNN architecture from `phoBERT-CNN` by a research group in UIT-NLP
 
 class CNN2HEAD_UIT(Module):
     def __init__(self, embedding_dim, n_filters=96, filter_sizes= [1,2,3,5],  dropout=0.2,activation=None):
