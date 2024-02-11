@@ -7,7 +7,12 @@ import copy
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+
 class CreateDataset:
+  """
+    This class will tokenize and create a dataset for 1-2 heads models
+  
+  """
   def __init__ (self,sentences,labels1,labels2,model_name,batch_size=32,max_length=128):
     self.tokenizer=AutoTokenizer.from_pretrained(model_name, use_fast=False)
     self.batch_size=batch_size
@@ -60,6 +65,9 @@ class CreateDataset:
 
 
 class Create3HEADDataset:
+  """
+    Same with `CreateDataset` but for 3 heads models
+  """
   def __init__ (self,sentences,labels1,labels2,labels3,model_name,batch_size=32,max_length=128):
     self.tokenizer=AutoTokenizer.from_pretrained(model_name, use_fast=False)
     self.batch_size=batch_size
@@ -112,7 +120,18 @@ class Create3HEADDataset:
     return self.data_loader
 
   
+# Since we cannot use the `DataCollatorForLanguageModeling` from the `transformers` library 
+# while training a customized model, we need to create our own `DataCollator` class called 
+# `DataCollatorHandMade`
 
+# It will have a method called `random_label` that will randomly mask some tokens in the input, 
+# followed by the traditional rule for masking tokens:
+
+# - 30% of the tokens will be masked follow the rule:
+
+# - 80% of the time, replace the token with the `[MASK]` token
+# - 10% of the time, keep the token unchanged
+# - 10% of the time, replace the token with a random token
 class DataCollatorHandMade:
     
     def __init__(self,model_name, mlm_prob = 0.3):
@@ -144,6 +163,8 @@ class DataCollatorHandMade:
 
           
           lucky_mask = torch.randint(1,11,size = (num_mask,), dtype=torch.int32)
+          # This 8/1/1 code looks messy. It's just a way to randomly replace the masked tokens
+          
           for i,lucky in enumerate(lucky_mask):
             if int(lucky)%8==0: # 10%
               mlm_input[mask_pos[i]] = input_id[mask_pos[i]]
@@ -156,6 +177,10 @@ class DataCollatorHandMade:
         mlm_inputs = torch.cat(mlm_inputs, dim=0).to(DEVICE)
         labels = torch.cat(labels, dim=0).to(DEVICE)
         return mlm_inputs, labels, total_mask
+
+# To calculate the loss for the masked language model, we need to create a function called 
+# `label_for_mlm`. This function will take the result from the model and the random masked labels, 
+# and return the predicted values and the labels in format which compatible with nn.CrossEntroyLoss.
       
 def label_for_mlm(result, mlm_labels):
     y_pred=[]
