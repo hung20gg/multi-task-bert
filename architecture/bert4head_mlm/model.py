@@ -8,7 +8,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
-
+"""
+    Read the doc on bert3head_mlm/model.py
+"""
 
 # @title Finetune Model
 

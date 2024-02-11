@@ -7,6 +7,18 @@ import torch.nn.functional as F
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+"""
+    This is the implementation of the SMART Loss function.
+    However, the outputs of the model is not compatable with the original implementation 
+    of the SMART Loss function, so we have to modify the original implementation to fit our.
+    
+    With n classification outputs (beside MLM), the model will have to load n times for each
+    addition SMART loss, therefore making training process quite heavy, consum lots of VRAM.
+    
+    Note: With batch_size=32, max_length = 64 and 2 tasks, the model will consume around 
+    10-11GB of VRAM.
+"""
+
 def kl_loss(input, target, reduction='batchmean'):
     return F.kl_div(
         F.log_softmax(input, dim=-1),
@@ -35,6 +47,7 @@ def default(val, d):
 
 def inf_norm(x):
     return torch.norm(x, p=float('inf'), dim=-1, keepdim=True)
+
 class SMARTLoss(nn.Module):
     
     def __init__(

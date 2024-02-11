@@ -1,8 +1,8 @@
 import wandb
 import torch
 import torch.nn as nn
-from bert3head.model import  BertLinear3HEAD
-from loss_function import SMARTLoss3Label, kl_loss, sym_kl_loss
+from architecture.bert4head_mlm.model import  BertLinear3HEAD
+from utils.loss_function import SMARTLoss3Label, kl_loss, sym_kl_loss
 from torch.optim import lr_scheduler,AdamW
 import numpy as np
 from tqdm import tqdm
