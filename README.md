@@ -17,4 +17,6 @@ To train the model, modify the model config in `train.py` and run
 
 `python3 train.py`
 
+We made a website for the implementation of the model, you can checkout [here](https://frontend-nlp.vercel.app/)
+
 If you are seeing this, it means that we havent finished documenting our code. Please be patient
