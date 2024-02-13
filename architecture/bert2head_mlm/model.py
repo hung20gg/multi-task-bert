@@ -3,6 +3,10 @@ from torch.nn import Module
 import torch.nn as nn
 from transformers import AutoModel
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
+
 """
     Read the doc on bert3head_mlm/model.py
 """
@@ -31,6 +35,8 @@ class Linear1HEADMLM(Module):
         sent = self.out_sent(embedded)
         if mlm:
           embedded2 = self.activation(self.fc_input2(encoded2))
+          # New
+          embedded2 = self.ln2(embedded2)
           mlm = self.MLM(embedded2)
           return sent, mlm
 
@@ -44,9 +50,20 @@ class BertLinear1HEADMLM(Module):
         self.BertModel.to(device)
         # self.phoBertModel.load_state_dict(torch.load(pretrained_path))
         self.linear = Linear1HEADMLM(768)
+    # def forward(self,sentences,attention,sentences2=None, mlm=False):
+    #    embedded = self.BertModel(sentences,attention_mask=attention).last_hidden_state[:,0,:]
+    #    embedded2 = nn.Identity(768)
+    #    if mlm:
+    #      embedded2 = self.BertModel(sentences2,attention)[0]
+    #    return self.linear(embedded,embedded2, mlm=mlm)
+    
+    # New forward
+
     def forward(self,sentences,attention,sentences2=None, mlm=False):
-       embedded = self.BertModel(sentences,attention_mask=attention).last_hidden_state[:,0,:]
-       embedded2 = nn.Identity(768)
+       embedded = self.BertModel(sentences,attention_mask=attention)
+       embedded_task = embedded.last_hidden_state[:,0,:]
+       embedded_mlm = nn.Identity(768)
        if mlm:
-         embedded2 = self.BertModel(sentences2,attention)[0]
-       return self.linear(embedded,embedded2, mlm=mlm)
+           embedded_mlm = embedded[0]
+        #  embedded2 = self.BertModel(sentences2,attention)[0]
+       return self.linear(embedded_task,embedded_mlm, mlm=mlm)

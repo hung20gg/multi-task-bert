@@ -59,6 +59,8 @@ class Linear3HEAD(Module):
         clas = self.out_clas(embedded)
         if mlm:
           embedded2 = self.activation(self.fc_input2(encoded2))
+          # New (i forgot to add a layer norm :))
+          embedded2 = self.ln2(embedded2)
           mlm = self.MLM(embedded2)
           return sent, clas, mlm
 
@@ -72,10 +74,12 @@ class BertLinear3HEAD(Module):
         self.BertModel.to(device)
         # self.phoBertModel.load_state_dict(torch.load(pretrained_path))
         self.linear = Linear3HEAD(768)
+
     def forward(self,sentences,attention,sentences2=None, mlm=False):
        embedded = self.BertModel(sentences,attention_mask=attention).last_hidden_state[:,0,:]
        embedded2 = nn.Identity(768)
        if mlm:
+         # Differet input (masked) so the model needed to be called again
          embedded2 = self.BertModel(sentences2,attention)[0]
        return self.linear(embedded,embedded2, mlm=mlm)
        

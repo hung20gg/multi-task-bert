@@ -1,6 +1,6 @@
 import torch
-from mlm_head_trainer import Trainer
-from dataloader import CreateDataset
+from Trainer.mlm_3head_trainer import Trainer
+from utils.dataloader import CreateDataset
 import pandas as pd
 
 # If you want to use wandb, uncomment the lines that are commented

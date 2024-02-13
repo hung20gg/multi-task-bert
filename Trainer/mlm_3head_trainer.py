@@ -7,7 +7,7 @@ from torch.optim import lr_scheduler,AdamW
 import numpy as np
 from tqdm import tqdm
 import time
-from dataloader import DataCollatorHandMade, label_for_mlm
+from utils.dataloader import DataCollatorHandMade, label_for_mlm
 
 from sklearn.metrics import accuracy_score,f1_score
 

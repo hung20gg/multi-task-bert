@@ -1,6 +1,6 @@
 import torch
-from mlm_head_trainer import Trainer
-from dataloader import Create4HEADDataset
+from Trainer.mlm_4head_trainer import Trainer
+from utils.dataloader import Create4HEADDataset
 import pandas as pd
 
 # import wandb
@@ -17,10 +17,7 @@ percentages = [0.5]
 for architecture in architectures:
   for p in percentages :
     extract = False
-    # if extract and architecture in ["linear"]:
-    #   continue
-    # if not extract and architecture in ["cnn",'cnn-uit']:
-    #   continue
+  
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("___________",bert_name,"____________")
     # wandb.init(

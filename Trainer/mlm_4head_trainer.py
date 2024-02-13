@@ -1,13 +1,13 @@
 import wandb
 import torch
 import torch.nn as nn
-from architecture.bert4head_mlm.model import  BertLinear3HEAD
+from architecture.bert4head_mlm.model import  BertLinear4HEAD
 from utils.loss_function import SMARTLoss3Label, kl_loss, sym_kl_loss
 from torch.optim import lr_scheduler,AdamW
 import numpy as np
 from tqdm import tqdm
 import time
-from dataloader import DataCollatorHandMade, label_for_mlm
+from utils.dataloader import DataCollatorHandMade, label_for_mlm
 
 from sklearn.metrics import accuracy_score,f1_score
 
