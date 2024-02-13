@@ -2,7 +2,7 @@
 
 This model will uitilize the dataset that have multiple labels. It will have n+1-heads according to n-tasks and a **MaskedLM** head.
 
-Our method achieves amazing result with our **NEU**, **VSFC** and **ViHSD** datasets:
+Our method achieves amazing result with our **NEU**, **VSFC** and **ViHSD** datasets (before we add layernorm hehe):
 
 | Task | Accuracy | F1 macro | F1 weighted |
 |----------|----------|----------|----------|
