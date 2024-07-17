@@ -21,15 +21,7 @@ class Trainer:
     self.lora=lora
     self.tokenizer=None
     
-    if model == "cnn":
-
-      self.bertcnn=BertCNN2HEAD(name)
-    elif model == "cnn-uit":
-      self.bertcnn=BertCNN2HEAD_UIT(name)
-  
-
-    else:
-      self.bertcnn=BertLinear2HEAD(name)
+    self.bertcnn=BertLinear2HEAD(name)
       
     if extract:
       if is_smart:

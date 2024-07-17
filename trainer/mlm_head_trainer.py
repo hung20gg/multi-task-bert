@@ -38,7 +38,7 @@ class Trainer:
 
     self.is_schedule = False
     self.model_prameters = list(self.bertcnn.parameters())
-    self.optimizer = AdamW(self.model_prameters, lr=1.5e-5, eps=5e-9)
+    self.optimizer = AdamW(self.model_prameters, lr=2e-5, eps=5e-9)
     self.criterion = nn.CrossEntropyLoss().to(self.device)
     self.smart_loss_fn = SMARTLoss(eval_fn = self.bertcnn, loss_fn = kl_loss, loss_last_fn = sym_kl_loss)
     self.weight = 0.02
@@ -120,7 +120,7 @@ class Trainer:
         loss1 = self.criterion(sent_predictions, b_sent) 
         loss2 = self.criterion(clas_predictions, b_clas) 
         
-        t_loss = (0.7*loss1 + loss2*0.3)*2
+        t_loss = (0.5*loss1 + loss2*0.5)*2
         epoch_loss += t_loss.item()
 
         sent_predictions = sent_predictions.detach().cpu().numpy()
@@ -164,7 +164,7 @@ class Trainer:
     if self.extract:
       temp = 5
     # self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=0.16667/2, total_iters=epochs)
-    self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=(0.2/epochs)*temp, total_iters=epochs)
+    self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=(0.15/epochs)*temp, total_iters=epochs)
     self.name=name
     if optim!=None:
       self.optimizer=optim

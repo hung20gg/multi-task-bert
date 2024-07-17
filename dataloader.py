@@ -8,7 +8,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class CreateDataset:
-  def __init__ (self,sentences,labels1,labels2,model_name,batch_size=32,max_length=128):
+  def __init__ (self,sentences,labels1,labels2,model_name,batch_size=32,max_length=128, shuffle=True):
     self.tokenizer=AutoTokenizer.from_pretrained(model_name, use_fast=False)
     self.batch_size=batch_size
     self.model_name=model_name
@@ -17,12 +17,12 @@ class CreateDataset:
     self.labels2 = labels2
     self.max_length=max_length
     self.device=  torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+    self.shuffle=shuffle
 
   def encoder_generator(self):
     # sentences= self.sentences
     
-    
+    print(self.sentences.size)
     sent_index = []
     input_ids = []
     attention_masks =[]
@@ -42,7 +42,8 @@ class CreateDataset:
     self.labels1 = torch.tensor(self.labels1).type(torch.LongTensor).to(DEVICE)
     self.labels2 = torch.tensor(self.labels2).type(torch.LongTensor).to(DEVICE)
     self.sent_index = torch.tensor(sent_index).to(DEVICE)
-
+    self.sent_index
+    print(self.input_ids.size())
   def todataloader(self):
     self.encoder_generator()
 
@@ -52,66 +53,24 @@ class CreateDataset:
     self.data_loader = DataLoader(self.dataset,
                                   # sampler=RandomSampler(self.dataset),
                                   batch_size=self.batch_size,
-                                  shuffle=True
+                                  shuffle=self.shuffle
                                   # generator = generator,
                                 )
     return self.data_loader
 
-
-
-class Create3HEADDataset:
-  def __init__ (self,sentences,labels1,labels2,labels3,model_name,batch_size=32,max_length=128):
-    self.tokenizer=AutoTokenizer.from_pretrained(model_name, use_fast=False)
-    self.batch_size=batch_size
-    self.model_name=model_name
-    self.sentences=np.array(sentences)
-    self.labels1 = labels1
-    self.labels2 = labels2
-    self.labels3 = labels3
-    self.max_length=max_length
-    self.device=  torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-
-  def encoder_generator(self):
-    # sentences= self.sentences
-    
-    
-    sent_index = []
-    input_ids = []
-    attention_masks =[]
-    for index,sent in enumerate(self.sentences):
-        sent_index.append(index)
-        encoded_dict = self.tokenizer.encode_plus(sent,
-                                             add_special_tokens=True,
-                                             max_length=self.max_length,
-                                             padding='max_length',
-                                             truncation = True,
-                                             return_attention_mask=True,
-                                             return_tensors='pt')
-        input_ids.append(encoded_dict['input_ids'])
-        attention_masks.append(encoded_dict['attention_mask'])
-    self.input_ids = torch.cat(input_ids,dim=0).to(DEVICE)
-    self.attention_masks = torch.cat(attention_masks,dim=0).to(DEVICE)
-    self.labels1 = torch.tensor(self.labels1).type(torch.LongTensor).to(DEVICE)
-    self.labels2 = torch.tensor(self.labels2).type(torch.LongTensor).to(DEVICE)
-    self.labels3 = torch.tensor(self.labels3).type(torch.LongTensor).to(DEVICE)
-    self.sent_index = torch.tensor(sent_index).to(DEVICE)
-
-  def todataloader(self):
+  def label(self):
     self.encoder_generator()
-
-
-    self.dataset = TensorDataset(self.input_ids, self.attention_masks ,self.labels1,self.labels2,self.labels3)
+    self.dataset = TensorDataset(self.sent_index, self.input_ids, self.attention_masks)
     # generator = torch.Generator(device=DEVICE)
     self.data_loader = DataLoader(self.dataset,
                                   # sampler=RandomSampler(self.dataset),
                                   batch_size=self.batch_size,
-                                  shuffle=True
+                                  shuffle=self.shuffle
                                   # generator = generator,
                                 )
     return self.data_loader
 
-  
+
 
 class DataCollatorHandMade:
     
