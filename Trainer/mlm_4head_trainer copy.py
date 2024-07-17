@@ -1,8 +1,8 @@
 import wandb
 import torch
 import torch.nn as nn
-from architecture.bert3head_mlm.model import  BertLinear3HEAD
-from utils.loss_function import SMARTLoss , kl_loss, sym_kl_loss
+from architecture.bert4head_mlm.model import  BertLinear4HEAD
+from utils.loss_function import SMARTLoss3Label, kl_loss, sym_kl_loss
 from torch.optim import lr_scheduler,AdamW
 import numpy as np
 from tqdm import tqdm
@@ -24,7 +24,7 @@ class Trainer:
     self.datacollator = DataCollatorHandMade(self.model_name)
     
     
-    self.bertcnn=BertLinear3HEAD(name)
+    self.bertcnn=BertLinear4HEAD(name)
       
     if extract:
       # if is_smart:
@@ -38,9 +38,9 @@ class Trainer:
 
     self.is_schedule = False
     self.model_prameters = list(self.bertcnn.parameters())
-    self.optimizer = AdamW(self.model_prameters, lr=2e-5, eps=5e-9)
+    self.optimizer = AdamW(self.model_prameters, lr=1.5e-5, eps=5e-9)
     self.criterion = nn.CrossEntropyLoss().to(self.device)
-    self.smart_loss_fn = SMARTLoss(eval_fn = self.bertcnn, loss_fn = kl_loss, loss_last_fn = sym_kl_loss)
+    self.smart_loss_fn = SMARTLoss3Label(eval_fn = self.bertcnn, loss_fn = kl_loss, loss_last_fn = sym_kl_loss)
     self.weight = 0.02
 
   def categorical_accuracy(self,preds, y):
@@ -63,18 +63,20 @@ class Trainer:
       b_input_mask = batch[1].to(self.device)
       b_sent = batch[2].to(self.device)
       b_clas = batch[3].to(self.device)
+      b_topic = batch[4].to(self.device)
       
       mlm_input_ids, mlm_labels, total_mask = self.datacollator.random_label(b_input_ids,b_input_mask)   
   
       self.optimizer.zero_grad()
 
       # sent_predictions, clas_predictions = self.bertcnn(b_input_ids, b_input_mask)
-      sent_predictions, clas_predictions, mlm_predictions = self.bertcnn(b_input_ids, b_input_mask, mlm_input_ids, mlm=True)
+      sent_predictions, clas_predictions, topic_predictions, mlm_predictions = self.bertcnn(b_input_ids, b_input_mask, mlm_input_ids, mlm=True)
       mlm_predictions, mlm_labels = label_for_mlm(mlm_predictions, mlm_labels)
       
       # if self.is_smart:
-      loss1 = self.criterion(sent_predictions, b_sent) + self.weight * self.smart_loss_fn(b_input_ids, sent_predictions, b_input_mask,sent=True)
-      loss2 = self.criterion(clas_predictions, b_clas) + self.weight * self.smart_loss_fn(b_input_ids, clas_predictions, b_input_mask,sent=False)
+      loss1 = self.criterion(sent_predictions, b_sent) + self.weight * self.smart_loss_fn(b_input_ids, sent_predictions, b_input_mask,task='sent')
+      loss2 = self.criterion(clas_predictions, b_clas) + self.weight * self.smart_loss_fn(b_input_ids, clas_predictions, b_input_mask,task='clas')
+      loss4 = self.criterion(topic_predictions, b_topic) + self.weight * self.smart_loss_fn(b_input_ids, topic_predictions, b_input_mask,task='topic')
       loss3 = self.criterion(mlm_predictions, mlm_labels)
       # # else:
       # loss1 = self.criterion(sent_predictions, b_sent)
@@ -82,7 +84,7 @@ class Trainer:
       avg_mask = total_mask/mlm_input_ids.shape[0]
  
       # t_loss = loss1 + loss2 
-      t_loss = loss1 + loss2 + loss3/avg_mask
+      t_loss = loss1 + loss2 + loss4 + loss3/avg_mask
       
 
       acc_sent = self.categorical_accuracy(sent_predictions, b_sent)
@@ -115,12 +117,13 @@ class Trainer:
         b_input_mask = batch[1].to(self.device)
         b_sent = batch[2].to(self.device)
         b_clas = batch[3].to(self.device)
+        
 
         sent_predictions, clas_predictions = self.bertcnn(b_input_ids,b_input_mask)
         loss1 = self.criterion(sent_predictions, b_sent) 
         loss2 = self.criterion(clas_predictions, b_clas) 
         
-        t_loss = (0.5*loss1 + loss2*0.5)*2
+        t_loss = (0.7*loss1 + loss2*0.3)*2
         epoch_loss += t_loss.item()
 
         sent_predictions = sent_predictions.detach().cpu().numpy()
@@ -164,7 +167,7 @@ class Trainer:
     if self.extract:
       temp = 5
     # self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=0.16667/2, total_iters=epochs)
-    self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=(0.15/epochs)*temp, total_iters=epochs)
+    self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=(0.2/epochs)*temp, total_iters=epochs)
     self.name=name
     if optim!=None:
       self.optimizer=optim

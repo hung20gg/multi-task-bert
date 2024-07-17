@@ -1,17 +1,18 @@
 import wandb
 import torch
 import torch.nn as nn
-from bert2head.model import BertCNN2HEAD, BertLinear2HEAD, BertCNN2HEAD_UIT
-from loss_function import SMARTLoss , kl_loss, sym_kl_loss
-from torch.optim import lr_scheduler,AdamW, Adam
+from architecture.bert2head_mlm.model import  BertLinear1HEADMLM
+from utils.loss_function import SMARTLoss1Label , kl_loss, sym_kl_loss
+from torch.optim import lr_scheduler,AdamW
 import numpy as np
 from tqdm import tqdm
 import time
+from utils.dataloader import DataCollatorHandMade, label_for_mlm
 
 from sklearn.metrics import accuracy_score,f1_score
 
 class Trainer:
-  def __init__(self,name,train_data_loader,test_data_loader,model="cnn",lora=False,is_smart=True,extract=False):
+  def __init__(self,name,train_data_loader,test_data_loader,model="cnn",lora=False,is_smart=True,extract=False,varient='hehe'):
 
     self.extract = extract
     self.is_smart = is_smart
@@ -20,23 +21,26 @@ class Trainer:
     self.model_name = name
     self.lora=lora
     self.tokenizer=None
+    self.datacollator = DataCollatorHandMade(self.model_name)
     
-    self.bertcnn=BertLinear2HEAD(name)
+    
+    self.bertcnn=BertLinear1HEADMLM(name)
       
     if extract:
-      if is_smart:
-        self.bertcnn.BertModel.load_state_dict(torch.load("models/finetuneBertsmart.pt"))
-      else:
-        self.bertcnn.BertModel.load_state_dict(torch.load("models/finetuneBert.pt"))
+      # if is_smart:
+      #   self.bertcnn.BertModel.load_state_dict(torch.load("models/finetuneBertsmart.pt"))
+      # else:
+        self.bertcnn.load_state_dict(torch.load(f"models/{model}/{varient}.pt"))
     self.bertcnn=self.bertcnn.to(self.device)
     self.train_data_loader = train_data_loader
+    # self.mlm_data_loader = mlm_data_loader
     self.test_data_loader  = test_data_loader
 
     self.is_schedule = False
     self.model_prameters = list(self.bertcnn.parameters())
-    self.optimizer = AdamW(self.model_prameters, lr=2e-5, eps=5e-9)
+    self.optimizer = AdamW(self.model_prameters, lr=1.8e-5, eps=5e-9)
     self.criterion = nn.CrossEntropyLoss().to(self.device)
-    self.smart_loss_fn = SMARTLoss(eval_fn = self.bertcnn, loss_fn = kl_loss, loss_last_fn = sym_kl_loss)
+    self.smart_loss_fn = SMARTLoss1Label(eval_fn = self.bertcnn, loss_fn = kl_loss, loss_last_fn = sym_kl_loss)
     self.weight = 0.02
 
   def categorical_accuracy(self,preds, y):
@@ -58,25 +62,30 @@ class Trainer:
       b_input_ids = batch[0].to(self.device)
       b_input_mask = batch[1].to(self.device)
       b_sent = batch[2].to(self.device)
-      b_clas = batch[3].to(self.device)
+           
+      mlm_input_ids, mlm_labels, total_mask = self.datacollator.random_label(b_input_ids,b_input_mask)   
+  
       self.optimizer.zero_grad()
 
-      sent_predictions, clas_predictions = self.bertcnn(b_input_ids,b_input_mask)
-
+      # sent_predictions, clas_predictions = self.bertcnn(b_input_ids, b_input_mask)
+      sent_predictions, mlm_predictions = self.bertcnn(b_input_ids, b_input_mask, mlm_input_ids, mlm=True)
+      mlm_predictions, mlm_labels = label_for_mlm(mlm_predictions, mlm_labels)
+      
       # if self.is_smart:
-      loss1 = self.criterion(sent_predictions, b_sent) + self.weight * self.smart_loss_fn(b_input_ids, sent_predictions, b_input_mask,sent=True)
-      loss2 = self.criterion(clas_predictions, b_clas) + self.weight * self.smart_loss_fn(b_input_ids, clas_predictions, b_input_mask,sent=False)
-      # else:
+      loss1 = self.criterion(sent_predictions, b_sent) + self.weight * self.smart_loss_fn(b_input_ids, sent_predictions, b_input_mask)
+      
+      loss3 = self.criterion(mlm_predictions, mlm_labels)
+      # # else:
       # loss1 = self.criterion(sent_predictions, b_sent)
       # loss2 = self.criterion(clas_predictions, b_clas)
-        
+      avg_mask = total_mask/mlm_input_ids.shape[0]
  
-      t_loss = loss1*self.percentage + loss2*(1-self.percentage)
-      
+      # t_loss = loss1 + loss2 
+      t_loss = loss1 +  loss3/avg_mask
       
 
       acc_sent = self.categorical_accuracy(sent_predictions, b_sent)
-      acc_clas = self.categorical_accuracy(clas_predictions, b_clas)
+
 
       self.optimizer.zero_grad()
       t_loss.backward()
@@ -84,7 +93,7 @@ class Trainer:
 
       epoch_loss += t_loss.item()
       epoch_acc_sent += acc_sent.item()
-      epoch_acc_clas += acc_clas.item()
+      
     if self.is_schedule:
       self.scheduler.step()
     return epoch_loss / len(self.train_data_loader), epoch_acc_sent / len(self.train_data_loader), epoch_acc_clas / len(self.train_data_loader)
@@ -104,37 +113,29 @@ class Trainer:
         b_input_ids = batch[0].to(self.device)
         b_input_mask = batch[1].to(self.device)
         b_sent = batch[2].to(self.device)
-        b_clas = batch[3].to(self.device)
 
-        sent_predictions, clas_predictions = self.bertcnn(b_input_ids,b_input_mask)
+        sent_predictions = self.bertcnn(b_input_ids,b_input_mask)
         loss1 = self.criterion(sent_predictions, b_sent) 
-        loss2 = self.criterion(clas_predictions, b_clas) 
-
-        t_loss = (0.7*loss1 + loss2*0.3)*2
+        
+        t_loss = loss1
         epoch_loss += t_loss.item()
 
         sent_predictions = sent_predictions.detach().cpu().numpy()
-        clas_predictions = clas_predictions.detach().cpu().numpy()
 
         label_sent = b_sent.to('cpu').numpy()
-        label_clas = b_clas.to('cpu').numpy()
-
         pred1, true1 = self.predictions_labels(sent_predictions,label_sent)
-        pred2, true2 = self.predictions_labels(clas_predictions,label_clas)
 
         all_pred_sent.extend(pred1)
-        all_pred_clas.extend(pred2)
 
         all_true_sent.extend(true1)
-        all_true_clas.extend(true2)
 
     val_accuracy_sent = accuracy_score(all_pred_sent,all_true_sent)
-    val_accuracy_clas = accuracy_score(all_pred_clas,all_true_clas)
+    val_accuracy_clas = 0
 
     sent_f1_score = f1_score(all_pred_sent,all_true_sent,average='macro')
     sent_f1_scorew = f1_score(all_pred_sent,all_true_sent,average='weighted')
-    clas_f1_score = f1_score(all_pred_clas,all_true_clas,average='macro')
-    clas_f1_scorew = f1_score(all_pred_clas,all_true_clas,average='weighted')
+    clas_f1_score = 0
+    clas_f1_scorew = 0
 
     accs = (val_accuracy_sent,val_accuracy_clas)
     f1s= (sent_f1_score,clas_f1_score,sent_f1_scorew,clas_f1_scorew)
@@ -152,9 +153,9 @@ class Trainer:
     self.percentage = percentage
     temp = 30
     if self.extract:
-      temp = 15
+      temp = 5
     # self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=0.16667/2, total_iters=epochs)
-    self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=(0.16667/epochs)*temp, total_iters=epochs)
+    self.scheduler = lr_scheduler.LinearLR(self.optimizer, start_factor=1.0, end_factor=(0.2/epochs)*temp, total_iters=epochs)
     self.name=name
     if optim!=None:
       self.optimizer=optim
@@ -183,7 +184,7 @@ class Trainer:
 
       epoch_mins, epoch_secs = self.epoch_time(start_time, end_time)
       
-      with open(f"log\log-{self.name}{'-smart'if self.is_smart else ''}-{'boosting-' if self.extract else ''}{int(self.percentage*10)}_{10-int(self.percentage*10)}-redo.txt","a") as f:
+      with open(f"log\log-{self.name}{'-smart'if self.is_smart else ''}-{'boosting-' if self.extract else ''}{int(self.percentage*10)}_{10-int(self.percentage*10)}-3head-vihsd-redo.txt","a") as f:
         f.write(f'\nEpoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
 
         f.write(f'\n\tTrain Loss : {train_loss:.3f}  | Val. Loss  : {valid_loss:.3f}')
@@ -200,8 +201,8 @@ class Trainer:
         print(f'\tVal.F1m se : {valid_f1s[0]*100:.2f}  | Val.F1m ca : {valid_f1s[1]*100:.2f}')
         print(f'\tVal.F1w se : {valid_f1s[2]*100:.2f}  | Val.F1w ca : {valid_f1s[3]*100:.2f}')
 
-        if valid_accs[1]>=0.8 and valid_accs[0]>=0.843 and valid_f1s[0]>=0.85 and valid_f1s[1]>=0.72:
-            torch.save(self.bertcnn.state_dict(),f'models/{self.model_type}/Epoch-{epoch+1}-2-head-{self.model_type}-{"smart"if self.is_smart else ""}{"-boosting" if self.extract else ""}-{int(self.percentage*10)}_{10-int(self.percentage*10)}-redo.pt')
+        if  valid_accs[0]>=0.875 and valid_f1s[0]>=675 :
+            torch.save(self.bertcnn.state_dict(),f'models/{self.model_type}/Epoch-{epoch+1}-2-head-{self.model_type}-{"smart"if self.is_smart else ""}{"-boosting" if self.extract else ""}-{int(self.percentage*10)}_{10-int(self.percentage*10)}-3head-vihsd-redo.pt')
             f.write(f'\nModel epoch {epoch+1} saved')
         f.write('\n=============Epoch Ended==============')
         print('\n=============Epoch Ended==============')

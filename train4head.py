@@ -1,5 +1,5 @@
 import torch
-from mlm_head_trainer import Trainer
+from trainer.mlm_head_trainer import Trainer
 from dataloader import Create4HEADDataset
 import pandas as pd
 

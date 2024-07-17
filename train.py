@@ -4,6 +4,8 @@ from trainer.base_trainer import Trainer
 from dataloader import CreateDataset
 import pandas as pd
 
+# If you want to use wandb, uncomment the lines that are commented
+
 # import wandb
 # wandb.login(key="b46a760f71842e87d8ac966f77b2db06d0a7085a")
 
