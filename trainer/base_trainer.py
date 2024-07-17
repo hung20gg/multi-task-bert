@@ -1,5 +1,5 @@
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification,TrainingArguments, Trainer, DataCollatorWithPadding
+from transformers import AutoModelForSequenceClassification
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, f1_score
@@ -12,23 +12,21 @@ class Trainer:
         self.task = task
         if task == 'sentiment':
             num_labels = 4
-        elif task == 'topic':
+        else:
             num_labels = 10
             
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=num_labels)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
         self.loss_fn = torch.nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=5e-5)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=2e-5)
         
-    def train(self, train_dataloader, val_dataloader, epochs=10, save_name='model'):
+    def train(self, train_dataloader, val_dataloader, epochs=10, save_name='model',metric='f1m'):
     
-        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer, max_lr=0.001, steps_per_epoch=len(train_dataloader), epochs=epochs)
+        self.scheduler = torch.optim.lr_scheduler.LinearLR(self.optimizer, start_factor=1, end_factor=0.2, total_iters=epochs)
         
-        final_model = None
-        f1m = 0
-        acc = 0
-        f1w = 0
+        max_metrics = 0
+        count_if_not_improve = 0
         
         for epoch in range(epochs):
             self.model.train()
@@ -46,16 +44,28 @@ class Trainer:
                 loss = self.loss_fn(outputs.logits, labels)
                 loss.backward()
                 self.optimizer.step()
-                self.scheduler.step()
+            self.scheduler.step()
             
             acc, f1m, f1w = self.evaluate(val_dataloader)
             print(f'Epoch {epoch+1}/{epochs}, acc: {acc}, f1m: {f1m}, f1w: {f1w}')
-            if f1m > f1m:
-                final_model.save_pretrained(f'models/linear/{save_name}.pt')
+            cur_metrics = f1m
+            if metric == 'f1w':
+                cur_metrics = f1w
+            if metric == 'acc':
+                cur_metrics = acc
+            if cur_metrics > max_metrics:
+                max_metrics = cur_metrics
+                self.model.save_pretrained(f'models/linear/{save_name}')
+                count_if_not_improve = 0
+            else:
+                count_if_not_improve += 1
+                if count_if_not_improve == 4:
+                    break
             
     def evaluate(self, dataloader, save_name=''):
         if save_name != '':
-            self.model.load_state_dict(torch.load(f'models/linear/{save_name}.pt'))
+            self.model = AutoModelForSequenceClassification.from_pretrained(f'models/linear/{save_name}')
+            self.model.to(self.device)
         self.model.eval()
         all_preds = []
         all_labels = []
