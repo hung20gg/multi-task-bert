@@ -38,7 +38,7 @@ class Trainer:
 
     self.is_schedule = False
     self.model_prameters = list(self.bertcnn.parameters())
-    self.optimizer = AdamW(self.model_prameters, lr=1.5e-5, eps=5e-9)
+    self.optimizer = AdamW(self.model_prameters, lr=2e-5, eps=5e-9)
     self.criterion = nn.CrossEntropyLoss().to(self.device)
     self.smart_loss_fn = SMARTLoss3Label(eval_fn = self.bertcnn, loss_fn = kl_loss, loss_last_fn = sym_kl_loss)
     self.weight = 0.02

@@ -19,6 +19,7 @@ class Trainer:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
         self.loss_fn = torch.nn.CrossEntropyLoss()
+        
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=2e-5)
         
     def train(self, train_dataloader, val_dataloader, epochs=10, save_name='model',metric='f1m'):
